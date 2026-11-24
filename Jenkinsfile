@@ -34,9 +34,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    docker build -t leave-service:2024SL70025 .
-                '''
+                sh 'docker build -t leave-service:2024SL70025 .'
             }
         }
 
@@ -59,6 +57,36 @@ pipeline {
                     done
 
                     docker logs leave-service-staging
+                    exit 1
+                '''
+            }
+        }
+
+        stage('Approval for Production') {
+            steps {
+                input message: 'Approve deployment to production?', ok: 'Deploy'
+            }
+        }
+
+        stage('Deploy to Production') {
+            steps {
+                sh '''
+                    docker rm -f leave-service-production 2>/dev/null || true
+
+                    docker run -d \
+                        --name leave-service-production \
+                        -e APP_ENV=production \
+                        -p 8086:8081 \
+                        leave-service:2024SL70025
+
+                    for i in $(seq 1 15); do
+                        if curl -fsS http://localhost:8086; then
+                            exit 0
+                        fi
+                        sleep 2
+                    done
+
+                    docker logs leave-service-production
                     exit 1
                 '''
             }
